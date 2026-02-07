@@ -551,40 +551,42 @@ function createFinancialMetricsSlide(pres: pptxgen, data: EnhancedSlideData) {
     }
   }
 
-  // RIGHT SIDE - Growth Story boxes
+  // RIGHT SIDE - Growth Story boxes (moved down to avoid overlap)
+  addSectionHeader(slide, 'Growth Story', 5.95, 0.7, 3.85, KELP_COLORS.orange);
+  
   const growthStories = data.enhancedContent?.growthStory || [
     'Strong revenue growth driven by market expansion',
     'Improving margins through operational efficiency',
     'Strategic investments in capacity expansion',
   ];
 
-  let storyY = 0.7;
+  let storyY = 1.1;
   growthStories.slice(0, 3).forEach((story) => {
     slide.addShape('rect', {
       x: 5.95,
       y: storyY,
       w: 3.85,
-      h: 0.65,
+      h: 0.55,
       fill: { color: 'FEF9E7' },
       line: { color: KELP_COLORS.orange, width: 1 },
     });
     slide.addText(story, {
       x: 6.05,
-      y: storyY + 0.1,
+      y: storyY + 0.08,
       w: 3.65,
-      h: 0.45,
+      h: 0.4,
       fontSize: 8,
       color: KELP_COLORS.textDark,
       valign: 'middle',
       fontFace: 'Arial',
     });
-    storyY += 0.75;
+    storyY += 0.6;
   });
 
   // Global Presence section
-  addSectionHeader(slide, 'Global Presence', 5.95, 3.0, 3.85);
+  addSectionHeader(slide, 'Global Presence', 5.95, 2.95, 3.85);
 
-  // PIE CHART for Export/Domestic split
+  // PIE CHART for Export/Domestic split - positioned left
   slide.addChart('pie', [
     {
       name: 'Sales',
@@ -593,9 +595,9 @@ function createFinancialMetricsSlide(pres: pptxgen, data: EnhancedSlideData) {
     }
   ], {
     x: 5.95,
-    y: 3.4,
-    w: 1.6,
-    h: 1.5,
+    y: 3.35,
+    w: 1.8,
+    h: 1.4,
     chartColors: [KELP_COLORS.primary, KELP_COLORS.orange],
     showLegend: true,
     legendPos: 'b',
@@ -608,50 +610,38 @@ function createFinancialMetricsSlide(pres: pptxgen, data: EnhancedSlideData) {
     titleBold: true,
   });
 
-  // World map placeholder
-  slide.addShape('rect', {
-    x: 7.65,
-    y: 3.4,
-    w: 2.15,
-    h: 1.5,
-    fill: { color: KELP_COLORS.lightGray },
-  });
-
-  // Map marker dots to simulate presence
-  const mapDots = [
-    { x: 7.9, y: 3.7 },   // USA
-    { x: 8.5, y: 3.6 },   // Europe
-    { x: 9.0, y: 3.9 },   // India
-    { x: 8.8, y: 4.2 },   // SEA
-    { x: 8.1, y: 4.3 },   // Brazil
-  ];
-
-  mapDots.forEach(dot => {
-    slide.addShape('ellipse', {
-      x: dot.x,
-      y: dot.y,
-      w: 0.15,
-      h: 0.15,
-      fill: { color: KELP_COLORS.primary },
-    });
-  });
-
-  slide.addText('🌍 Global Presence Map', {
-    x: 7.65,
-    y: 4.6,
-    w: 2.15,
+  // Global presence text list - positioned right of pie chart
+  const presence = companyData?.globalPresence || ['India', 'Germany', 'United States', 'Middle East'];
+  let presenceY = 3.4;
+  
+  slide.addText('Key Markets:', {
+    x: 7.85,
+    y: presenceY,
+    w: 2.0,
     h: 0.25,
-    fontSize: 7,
-    color: KELP_COLORS.textMuted,
-    align: 'center',
+    fontSize: 9,
+    bold: true,
+    color: KELP_COLORS.primary,
     fontFace: 'Arial',
   });
+  presenceY += 0.3;
+  
+  presence.slice(0, 4).forEach((market) => {
+    slide.addText(`• ${market}`, {
+      x: 7.85,
+      y: presenceY,
+      w: 2.0,
+      h: 0.22,
+      fontSize: 8,
+      color: KELP_COLORS.textDark,
+      fontFace: 'Arial',
+    });
+    presenceY += 0.25;
+  });
 
-  // Global presence text
-  const presence = companyData?.globalPresence || ['USA', 'Europe', 'Middle East', 'Asia Pacific'];
   slide.addText(`Markets: ${presence.slice(0, 4).join(', ')}`, {
     x: 5.95,
-    y: 4.95,
+    y: 4.85,
     w: 3.85,
     h: 0.2,
     fontSize: 7,
