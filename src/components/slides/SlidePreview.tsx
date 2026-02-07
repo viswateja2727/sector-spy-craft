@@ -48,6 +48,7 @@ export function SlidePreview({ teaser, futurePlans, companyData }: SlidePreviewP
         teaser,
         futurePlans,
         projectName: aiContent?.projectName || 'Project Apex',
+        companyData,
         enhancedContent: aiContent ? {
           businessOverview: aiContent.businessOverview,
           investmentHighlights: aiContent.investmentHighlights,
