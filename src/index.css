@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Kelp Branding Design System */
+
+@layer base {
+  :root {
+    /* Kelp Brand Colors */
+    --background: 240 20% 98%;
+    --foreground: 233 47% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 233 47% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 233 47% 15%;
+
+    /* Kelp Primary - Deep Indigo */
+    --primary: 233 47% 20%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light Slate */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 233 47% 20%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent - Gradient start (Pink-Orange) */
+    --accent: 330 80% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 233 47% 20%;
+
+    --radius: 0.75rem;
+
+    /* Kelp Custom Tokens */
+    --kelp-indigo: 233 47% 20%;
+    --kelp-indigo-light: 233 35% 35%;
+    --kelp-pink: 330 80% 60%;
+    --kelp-orange: 25 95% 55%;
+    --kelp-gradient-start: 330 80% 60%;
+    --kelp-gradient-end: 25 95% 55%;
+    --kelp-surface: 240 20% 98%;
+    --kelp-surface-elevated: 0 0% 100%;
+
+    --sidebar-background: 233 47% 15%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 330 80% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 233 35% 25%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 233 35% 25%;
+    --sidebar-ring: 330 80% 60%;
+  }
+
+  .dark {
+    --background: 233 47% 8%;
+    --foreground: 0 0% 95%;
+
+    --card: 233 47% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 233 47% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 0 0% 100%;
+    --primary-foreground: 233 47% 15%;
+
+    --secondary: 233 35% 20%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 233 35% 20%;
+    --muted-foreground: 220 9% 65%;
+
+    --accent: 330 80% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 233 35% 20%;
+    --input: 233 35% 20%;
+    --ring: 330 80% 60%;
+
+    --kelp-indigo: 233 35% 25%;
+    --kelp-indigo-light: 233 25% 45%;
+    --kelp-surface: 233 47% 8%;
+    --kelp-surface-elevated: 233 47% 12%;
+
+    --sidebar-background: 233 47% 8%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 330 80% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 233 35% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 233 35% 15%;
+    --sidebar-ring: 330 80% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .kelp-gradient {
+    @apply bg-gradient-to-r from-[hsl(var(--kelp-pink))] to-[hsl(var(--kelp-orange))];
+  }
+
+  .kelp-gradient-text {
+    @apply bg-gradient-to-r from-[hsl(var(--kelp-pink))] to-[hsl(var(--kelp-orange))] bg-clip-text text-transparent;
+  }
+
+  .kelp-gradient-border {
+    @apply relative;
+    background: linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+                linear-gradient(135deg, hsl(var(--kelp-pink)), hsl(var(--kelp-orange))) border-box;
+    border: 2px solid transparent;
+  }
+
+  .slide-shadow {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                0 12px 24px -8px rgba(0, 0, 0, 0.15);
+  }
+
+  .glass-effect {
+    @apply backdrop-blur-xl bg-white/80 dark:bg-black/40;
+  }
+}
