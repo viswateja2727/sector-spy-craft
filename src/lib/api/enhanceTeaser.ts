@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { CompanyData } from '@/types/company';
+import { CompanyProfile } from '@/lib/companyProfiler';
 
 export interface EnhancedTeaserContent {
   businessOverview: {
@@ -16,7 +17,10 @@ export interface EnhancedTeaserContent {
   imageUrls: string[];
 }
 
-export async function enhanceTeaserContent(companyData: CompanyData): Promise<EnhancedTeaserContent | null> {
+export async function enhanceTeaserContent(
+  companyData: CompanyData,
+  profile?: CompanyProfile
+): Promise<EnhancedTeaserContent | null> {
   try {
     const { data, error } = await supabase.functions.invoke('enhance-teaser', {
       body: {
@@ -37,7 +41,9 @@ export async function enhanceTeaserContent(companyData: CompanyData): Promise<En
           swot: companyData.swot,
           futurePlans: companyData.futurePlans,
           sector: companyData.templateType,
-        }
+        },
+        archetype: profile?.archetype,
+        narrativeAngles: profile?.narrativeAngles,
       }
     });
 
