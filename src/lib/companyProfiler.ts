@@ -56,9 +56,9 @@ export type SlideType =
  */
 export function profileCompany(data: CompanyData): CompanyProfile {
   const dataFlags = analyzeDataRichness(data);
-  const archetype = classifyArchetype(data, dataFlags);
-  const slideStructure = determineSlideStructure(archetype, dataFlags);
-  const narrativeAngles = determineNarrativeAngles(archetype, data, dataFlags);
+  const classification = classifyArchetype(data, dataFlags);
+  const slideStructure = determineSlideStructure(classification.archetype, dataFlags);
+  const narrativeAngles = determineNarrativeAngles(classification.archetype, data, dataFlags);
 
   return {
     ...archetype,
