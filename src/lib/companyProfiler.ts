@@ -61,7 +61,7 @@ export function profileCompany(data: CompanyData): CompanyProfile {
   const narrativeAngles = determineNarrativeAngles(classification.archetype, data, dataFlags);
 
   return {
-    ...archetype,
+    ...classification,
     slideStructure,
     narrativeAngles,
     dataFlags,
