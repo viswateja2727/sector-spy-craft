@@ -16,7 +16,11 @@ interface TeaserInput {
     sector: string;
   };
   archetype?: string;
-  narrativeAngles?: string[];
+  narrativeStrategy?: {
+    focus: string[];
+    avoidGeneric: string[];
+    dataBackedAngles: string[];
+  };
 }
 
 serve(async (req) => {
@@ -30,54 +34,64 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const { companyData, archetype, narrativeAngles }: TeaserInput = await req.json();
+    const { companyData, archetype, narrativeStrategy }: TeaserInput = await req.json();
 
     const archetypeContext = archetype
       ? `\nCOMPANY ARCHETYPE: ${archetype}
-This company has been classified as a "${archetype}" type. Tailor your output accordingly:
-- single_product: Focus on depth of the single offering, competitive moat, niche dominance
-- multi_sku: Emphasize portfolio breadth, cross-selling, segment diversification
-- platform_saas: Highlight network effects, recurring revenue, unit economics
+Tailor your output to this business model:
+- single_product: Focus on product differentiation, IP advantage, niche dominance, scalability
+- multi_sku: Emphasize manufacturing capability, product diversification, OEM relationships, global exports
+- platform_saas: Highlight recurring revenue, client retention, technology expertise, partnerships
+- consumer_brand: Focus on network footprint, customer reach, brand strength, operating leverage
+- infra_logistics: Emphasize network scale, operational infrastructure, sector tailwinds
+- deep_tech: Focus on technology IP, defense/aerospace applications, high barriers to entry
 - asset_heavy: Focus on barriers to entry, operational efficiency, certifications
-- service_b2b: Emphasize client relationships, domain expertise, retention
-- consumer_brand: Focus on brand equity, consumer trends, D2C advantages
-
-${narrativeAngles?.length ? `KEY NARRATIVE ANGLES TO EMPHASIZE:\n${narrativeAngles.map(a => `- ${a}`).join('\n')}` : ''}`
+- service_b2b: Emphasize client relationships, domain expertise, retention`
       : '';
 
-    const systemPrompt = `You are an investment banking analyst creating professional M&A teaser slides. 
-Your task is to transform raw company data into compelling, anonymized investment narratives.
+    const narrativeContext = narrativeStrategy
+      ? `\nNARRATIVE STRATEGY:
+Focus areas: ${narrativeStrategy.focus.join(', ')}
+Data-backed angles to incorporate: ${narrativeStrategy.dataBackedAngles.join('; ')}
+PHRASES TO AVOID (generic IB clichés): ${narrativeStrategy.avoidGeneric.join(', ')}`
+      : '';
 
-CRITICAL RULES:
-1. NEVER mention specific company names, founder names, or exact locations
-2. Use generic terms like "The Company", "The Target", "Leading [Sector] Player"
-3. Preserve ALL numerical data exactly as provided
-4. Write in professional investment banking language
-5. Each bullet point should be impactful and value-focused
-6. ADAPT your narrative structure to match the company's business model — do NOT use a generic template
+    const systemPrompt = `You are an investment banking analyst writing M&A teaser content.
+
+STRICT RULES — VIOLATIONS ARE UNACCEPTABLE:
+1. Use ONLY information explicitly present in the provided dataset.
+2. Do NOT invent statistics, percentages, counts, or any numbers not in the data.
+3. If a metric is not present, OMIT IT — do not estimate or approximate.
+4. Financial values must match EXACTLY with the dataset.
+5. All calculations (growth, margins, CAGR) must be derivable from the provided numbers.
+6. Do NOT use generic investment phrases like "strong growth trajectory", "well-positioned", "best-in-class", "proven track record" UNLESS directly supported by specific data points.
+7. Instead use data-backed statements: "Revenue increased from ₹X in FY21 to ₹Y in FY25" or "EBITDA margin of X% in FY25".
+8. NEVER mention specific company names, founder names, or exact locations.
+9. Use "The Company", "The Target", or "Leading [Sector] Player".
+10. Write like an investment banker, not a marketer.
 ${archetypeContext}
+${narrativeContext}
 
-OUTPUT FORMAT:
-Return a JSON object with the following structure:
+OUTPUT FORMAT — Return ONLY valid JSON:
 {
   "businessOverview": {
-    "headline": "One compelling sentence about the company's market position, tailored to the business type",
-    "bullets": ["4-5 anonymized key business highlights, adapted to what matters most for this type of business"]
+    "headline": "One data-backed sentence about the company's position",
+    "bullets": ["4-5 data-backed business highlights, each referencing specific numbers from the dataset"]
   },
   "investmentHighlights": [
     {
-      "title": "Short theme title (3-4 words)",
-      "description": "Compelling one-liner about this investment merit"
+      "title": "Short theme (3-4 words)",
+      "description": "One data-backed sentence — must reference actual numbers or facts from the dataset"
     }
   ],
   "growthStory": [
-    "3 compelling narratives about growth trajectory and strategy, specific to the business model"
+    "3 data-backed narratives referencing specific financial or operational metrics from the dataset"
   ],
-  "sectorKeywords": ["5 keywords for finding relevant stock images"],
-  "projectName": "Creative codename for the deal (e.g., Project Alpha, Project Horizon)"
+  "sectorKeywords": ["5 keywords for sector-relevant imagery"],
+  "projectName": "Creative codename (e.g., Project Alpha, Project Horizon)"
 }`;
 
-    const userPrompt = `Transform this company data into an investment teaser:
+    const userPrompt = `Transform this company data into investment teaser content. Use ONLY the data below — do not invent any numbers.
 
 SECTOR: ${companyData.sector}
 
@@ -102,9 +116,9 @@ ${companyData.swot.opportunities.join('\n')}
 FUTURE PLANS:
 ${companyData.futurePlans.join('\n')}
 
-Generate professional, anonymized content for the investment teaser. Return ONLY valid JSON.`;
+Generate professional, anonymized, DATA-BACKED content. Every claim must reference actual data from above. Return ONLY valid JSON.`;
 
-    console.log('Calling Lovable AI Gateway...');
+    console.log('Calling Lovable AI Gateway with strict data-only prompt...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -118,14 +132,13 @@ Generate professional, anonymized content for the investment teaser. Return ONLY
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temp for factual accuracy
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Lovable AI Gateway error:', response.status, errorText);
-      
       if (response.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
       if (response.status === 402) throw new Error('AI credits exhausted. Please add credits to your workspace.');
       throw new Error(`AI Gateway error: ${response.status}`);
@@ -176,6 +189,18 @@ async function getStockImageUrls(keywords: string[]): Promise<string[]> {
       'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=800&h=600&fit=crop',
       'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&h=600&fit=crop',
     ],
+    'logistics': [
+      'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=800&h=600&fit=crop',
+    ],
+    'defense': [
+      'https://images.unsplash.com/photo-1517976487492-5750f3195933?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1540575467063-178a50c1a7a0?w=800&h=600&fit=crop',
+    ],
+    'entertainment': [
+      'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800&h=600&fit=crop',
+    ],
     'default': [
       'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=600&fit=crop',
       'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop',
@@ -184,7 +209,10 @@ async function getStockImageUrls(keywords: string[]): Promise<string[]> {
 
   const keywordStr = keywords.join(' ').toLowerCase();
   if (keywordStr.includes('manufactur') || keywordStr.includes('factory')) return sectorImages.manufacturing;
-  if (keywordStr.includes('tech') || keywordStr.includes('software')) return sectorImages.technology;
+  if (keywordStr.includes('tech') || keywordStr.includes('software') || keywordStr.includes('saas')) return sectorImages.technology;
   if (keywordStr.includes('pharma') || keywordStr.includes('medical')) return sectorImages.pharma;
+  if (keywordStr.includes('logistic') || keywordStr.includes('transport') || keywordStr.includes('freight')) return sectorImages.logistics;
+  if (keywordStr.includes('defense') || keywordStr.includes('defence') || keywordStr.includes('aerospace')) return sectorImages.defense;
+  if (keywordStr.includes('cinema') || keywordStr.includes('entertainment') || keywordStr.includes('screen')) return sectorImages.entertainment;
   return sectorImages.default;
 }
