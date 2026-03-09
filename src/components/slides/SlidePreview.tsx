@@ -25,6 +25,8 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   asset_heavy: '🏭 Asset-Intensive Industrial',
   service_b2b: '🤝 B2B Services',
   consumer_brand: '🛒 Consumer Brand',
+  infra_logistics: '🚛 Infrastructure / Logistics',
+  deep_tech: '🔬 Deep-Tech / Aerospace / Defense',
 };
 
 export function SlidePreview({ teaser, futurePlans, companyData }: SlidePreviewProps) {
