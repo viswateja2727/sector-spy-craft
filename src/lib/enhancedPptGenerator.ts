@@ -76,8 +76,21 @@ function getArchetypeLabel(archetype: CompanyArchetype): string {
     asset_heavy: 'Industrial / Asset-Intensive Company',
     service_b2b: 'B2B Services Company',
     consumer_brand: 'Consumer Brand',
+    infra_logistics: 'Infrastructure / Logistics Company',
+    deep_tech: 'Deep-Tech / Aerospace / Defense',
   };
   return labels[archetype] || 'Company';
+}
+
+/** Round financial numbers to max 2 decimals, no floating point artifacts */
+function fmtNum(n: number): string {
+  return parseFloat(n.toFixed(2)).toLocaleString('en-IN');
+}
+
+/** Compute CAGR from two values and number of years */
+function computeCAGR(start: number, end: number, years: number): number | null {
+  if (start <= 0 || end <= 0 || years <= 0) return null;
+  return Math.round(((Math.pow(end / start, 1 / years) - 1) * 100) * 100) / 100;
 }
 
 // ─── Main entry point ────────────────────────────────────────
@@ -95,7 +108,6 @@ export async function generateEnhancedPowerPoint(data: EnhancedSlideData): Promi
     'cover', 'business_overview', 'financial_performance', 'investment_highlights'
   ];
 
-  // Build slides dynamically based on the profile's recommended structure
   for (const slideType of slideTypes) {
     switch (slideType) {
       case 'cover':
@@ -125,6 +137,12 @@ export async function generateEnhancedPowerPoint(data: EnhancedSlideData): Promi
       case 'growth_trajectory':
         createGrowthTrajectorySlide(pres, data);
         break;
+      case 'technology_platform':
+        createTechnologyPlatformSlide(pres, data);
+        break;
+      case 'network_footprint':
+        createNetworkFootprintSlide(pres, data);
+        break;
       case 'investment_highlights':
         createInvestmentHighlightsSlide(pres, data, profile);
         break;
@@ -149,7 +167,6 @@ function createCoverSlide(pres: pptxgen, data: EnhancedSlideData, profile?: Comp
     fontSize: 44, bold: true, color: KELP_COLORS.navy, fontFace: 'Arial',
   });
 
-  // Adaptive subtitle based on archetype
   const subtitle = profile
     ? `Investment Brief | ${getArchetypeLabel(profile.archetype)}`
     : 'Investment Brief';
@@ -161,10 +178,11 @@ function createCoverSlide(pres: pptxgen, data: EnhancedSlideData, profile?: Comp
 
   slide.addShape('rect', { x: 0.5, y: 3.7, w: 2, h: 0.04, fill: { color: KELP_COLORS.orange } });
 
-  // Show narrative angles on cover if available
-  if (profile?.narrativeAngles && profile.narrativeAngles.length > 0) {
+  // Show data-backed narrative angles on cover
+  const angles = profile?.narrativeStrategy?.dataBackedAngles || [];
+  if (angles.length > 0) {
     let angleY = 3.9;
-    profile.narrativeAngles.slice(0, 3).forEach((angle) => {
+    angles.slice(0, 3).forEach((angle) => {
       slide.addText(`▸ ${angle}`, {
         x: 0.5, y: angleY, w: 6, h: 0.28,
         fontSize: 10, color: KELP_COLORS.textMuted, fontFace: 'Arial',
@@ -204,10 +222,9 @@ function createBusinessOverviewSlide(pres: pptxgen, data: EnhancedSlideData, pro
     yPos += 0.42;
   });
 
-  // RIGHT: At-a-Glance metrics
+  // RIGHT: At-a-Glance metrics (only from actual data)
   addSectionHeader(slide, 'At a Glance', 5.7, 0.7, 4.1, KELP_COLORS.orange);
-  const metrics = data.teaser.slides[1]?.content.metrics || [];
-  const glanceItems = buildGlanceItems(companyData, metrics, profile?.archetype);
+  const glanceItems = buildGlanceItems(companyData, profile?.archetype);
 
   let glanceY = 1.1;
   glanceItems.forEach((item) => {
@@ -223,15 +240,14 @@ function createBusinessOverviewSlide(pres: pptxgen, data: EnhancedSlideData, pro
     glanceY += 0.52;
   });
 
-  // BOTTOM: Clients + Certs (if available)
+  // BOTTOM: Clients + Certs (if available in data)
   if (companyData?.clients && companyData.clients.length > 0) {
     addSectionHeader(slide, 'Key Clients', 0.3, 3.4, 5.2);
     let clientX = 0.4;
     companyData.clients.slice(0, 6).forEach((client) => {
       slide.addShape('roundRect', {
         x: clientX, y: 3.8, w: 1.5, h: 0.5,
-        fill: { color: KELP_COLORS.lightGray },
-        rectRadius: 0.05,
+        fill: { color: KELP_COLORS.lightGray }, rectRadius: 0.05,
       });
       slide.addText(client.slice(0, 18), {
         x: clientX, y: 3.85, w: 1.5, h: 0.4,
@@ -256,32 +272,28 @@ function createBusinessOverviewSlide(pres: pptxgen, data: EnhancedSlideData, pro
   addFooter(slide);
 }
 
-function buildGlanceItems(companyData?: CompanyData, metrics?: any[], archetype?: CompanyArchetype) {
+/** Build at-a-glance items from actual data only — no invented values */
+function buildGlanceItems(companyData?: CompanyData, archetype?: CompanyArchetype) {
   const items: Array<{ icon: string; label: string; value: string }> = [];
 
   if (companyData?.details?.founded) {
     const years = new Date().getFullYear() - parseInt(companyData.details.founded);
-    items.push({ icon: '📅', label: 'Years in Operation', value: `${years}+ years` });
+    if (!isNaN(years)) items.push({ icon: '📅', label: 'Years in Operation', value: `${years}+ years` });
   }
   if (companyData?.details?.employees) {
     items.push({ icon: '👥', label: 'Team Size', value: companyData.details.employees });
   }
-  if (companyData?.productsServices) {
-    items.push({ icon: '📦', label: 'Product Lines', value: `${companyData.productsServices.length}+ SKUs` });
+  if (companyData?.productsServices && companyData.productsServices.length > 0) {
+    items.push({ icon: '📦', label: 'Product Lines', value: `${companyData.productsServices.length}` });
   }
   if (companyData?.globalPresence && companyData.globalPresence.length > 0) {
-    items.push({ icon: '🌍', label: 'Markets', value: `${companyData.globalPresence.length}+ regions` });
+    items.push({ icon: '🌍', label: 'Markets', value: `${companyData.globalPresence.length} regions` });
   }
   if (companyData?.certifications && companyData.certifications.length > 0) {
-    items.push({ icon: '🏅', label: 'Certifications', value: `${companyData.certifications.length} certifications` });
+    items.push({ icon: '🏅', label: 'Certifications', value: `${companyData.certifications.length}` });
   }
-
-  // Archetype-specific extras
-  if (archetype === 'platform_saas') {
-    items.push({ icon: '🔄', label: 'Revenue Model', value: 'Recurring / SaaS' });
-  }
-  if (archetype === 'consumer_brand') {
-    items.push({ icon: '🛒', label: 'Channel', value: 'Direct-to-Consumer' });
+  if (companyData?.clients && companyData.clients.length > 0) {
+    items.push({ icon: '🤝', label: 'Key Clients', value: `${companyData.clients.length}` });
   }
 
   return items.slice(0, 5);
@@ -295,9 +307,7 @@ function createProductDeepDiveSlide(pres: pptxgen, data: EnhancedSlideData) {
 
   addHeaderBar(slide, 'Product Deep Dive');
 
-  // Single product focus — show applications, value chain position, competitive advantages
   const product = companyData?.productsServices?.[0] || 'Core Product';
-
   addSectionHeader(slide, `Core Offering: ${typeof product === 'string' ? product.slice(0, 40) : 'Primary Product'}`, 0.3, 0.7, 9.5);
 
   // Applications served
@@ -312,19 +322,19 @@ function createProductDeepDiveSlide(pres: pptxgen, data: EnhancedSlideData) {
     appY += 0.3;
   });
 
-  // Competitive advantages (from SWOT strengths)
+  // Competitive advantages from SWOT strengths (actual data)
   addSectionHeader(slide, 'Competitive Advantages', 5.1, 1.2, 4.7);
   const strengths = companyData?.swot.strengths || [];
   let sY = 1.6;
   strengths.slice(0, 5).forEach((s) => {
-    slide.addText(`● ${s.split(':')[0] || s.slice(0, 60)}`, {
+    slide.addText(`● ${s.slice(0, 70)}`, {
       x: 5.2, y: sY, w: 4.5, h: 0.32,
       fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
     });
     sY += 0.35;
   });
 
-  // Market size if available
+  // Market size if available in data
   if (companyData?.marketSize && companyData.marketSize.length > 0) {
     addSectionHeader(slide, 'Addressable Market', 0.3, 3.8, 9.5, KELP_COLORS.teal);
     let mX = 0.4;
@@ -359,9 +369,7 @@ function createProductPortfolioSlide(pres: pptxgen, data: EnhancedSlideData) {
   // Product grid
   addSectionHeader(slide, 'Product Portfolio', 0.3, 0.7, 4.5);
   const products = companyData?.productsServices || [];
-  
-  let pX = 0.4;
-  let pY = 1.15;
+
   products.slice(0, 8).forEach((prod, idx) => {
     const col = idx % 2;
     const row = Math.floor(idx / 2);
@@ -382,46 +390,33 @@ function createProductPortfolioSlide(pres: pptxgen, data: EnhancedSlideData) {
   // Industries served — right side
   addSectionHeader(slide, 'Industries Served', 5.1, 0.7, 4.7, KELP_COLORS.orange);
   const industries = companyData?.applicationsIndustries || [];
-  let indX = 5.2;
   let indY = 1.15;
   industries.slice(0, 8).forEach((ind, idx) => {
     slide.addShape('ellipse', {
-      x: indX, y: indY, w: 0.35, h: 0.35,
+      x: 5.2, y: indY, w: 0.35, h: 0.35,
       fill: { color: KELP_COLORS.primary },
     });
     slide.addText(`${idx + 1}`, {
-      x: indX + 0.05, y: indY + 0.05, w: 0.25, h: 0.25,
+      x: 5.25, y: indY + 0.05, w: 0.25, h: 0.25,
       fontSize: 9, color: KELP_COLORS.white, align: 'center', fontFace: 'Arial',
     });
     slide.addText(ind.slice(0, 30), {
-      x: indX + 0.45, y: indY, w: 4.1, h: 0.35,
+      x: 5.65, y: indY, w: 4.1, h: 0.35,
       fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial', valign: 'middle',
     });
     indY += 0.42;
   });
 
-  // Global presence at bottom if available
+  // Global presence at bottom
   if (companyData?.globalPresence && companyData.globalPresence.length > 0) {
-    addSectionHeader(slide, 'Global Footprint', 0.3, 3.7, 9.5, KELP_COLORS.teal);
-    
-    // Pie chart for export/domestic
-    slide.addChart('pie', [{
-      name: 'Presence',
-      labels: ['Export', 'Domestic'],
-      values: [65, 35],
-    }], {
-      x: 0.3, y: 4.1, w: 2.0, h: 1.0,
-      chartColors: [KELP_COLORS.primary, KELP_COLORS.orange],
-      showPercent: true, showLegend: true, legendPos: 'b', legendFontSize: 7,
-    });
-
-    let mkX = 2.6;
-    companyData.globalPresence.slice(0, 6).forEach((market) => {
+    addSectionHeader(slide, 'Geographic Markets', 0.3, 3.7, 9.5, KELP_COLORS.teal);
+    let mkY = 4.1;
+    companyData.globalPresence.slice(0, 8).forEach((market) => {
       slide.addText(`● ${market}`, {
-        x: mkX, y: 4.3, w: 1.4, h: 0.25,
+        x: 0.4, y: mkY, w: 4.5, h: 0.25,
         fontSize: 8, color: KELP_COLORS.textDark, fontFace: 'Arial',
       });
-      mkX += 1.5;
+      mkY += 0.25;
     });
   }
 
@@ -432,89 +427,120 @@ function createProductPortfolioSlide(pres: pptxgen, data: EnhancedSlideData) {
 
 function createFinancialSlide(pres: pptxgen, data: EnhancedSlideData) {
   const slide = pres.addSlide();
-  const teaser = data.teaser;
   const companyData = data.companyData;
 
   addHeaderBar(slide, 'Financial Performance');
 
-  // KPI boxes
-  const metrics = teaser.slides[1]?.content.metrics || [];
-  const kpiData = metrics.slice(0, 4).map((m) => ({
-    label: m.label,
-    value: `${m.value} ${m.unit || ''}`.trim(),
-    change: m.change,
-  }));
-
-  // Fill with defaults if needed
-  while (kpiData.length < 3) {
-    kpiData.push({ label: 'Metric', value: 'N/A', change: undefined });
+  // Build KPI boxes from actual financial data — no defaults
+  const financials = companyData?.financials?.incomeStatement || [];
+  const sorted = [...financials].filter(f => f.revenue && f.revenue > 0).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+  
+  const kpiData: Array<{ label: string; value: string; subtext: string }> = [];
+  
+  if (sorted.length > 0) {
+    const latest = sorted[sorted.length - 1];
+    kpiData.push({ label: `Revenue FY${latest.year}`, value: `₹${fmtNum(latest.revenue!)}`, subtext: '' });
+    
+    if (latest.ebitda) {
+      const margin = Math.round((latest.ebitda / latest.revenue!) * 10000) / 100;
+      kpiData.push({ label: `EBITDA FY${latest.year}`, value: `₹${fmtNum(latest.ebitda)}`, subtext: `Margin: ${margin}%` });
+    }
+    if (latest.pat) {
+      kpiData.push({ label: `PAT FY${latest.year}`, value: `₹${fmtNum(latest.pat)}`, subtext: '' });
+    }
+    if (sorted.length >= 2) {
+      const first = sorted[0];
+      const years = parseInt(latest.year) - parseInt(first.year);
+      const cagr = computeCAGR(first.revenue!, latest.revenue!, years);
+      if (cagr !== null) {
+        kpiData.push({ label: `Revenue CAGR`, value: `${cagr}%`, subtext: `FY${first.year}–FY${latest.year}` });
+      }
+    }
   }
 
   let kpiX = 0.3;
-  kpiData.forEach((kpi) => {
-    const bgColor = kpi.change && kpi.change > 0 ? KELP_COLORS.primary : KELP_COLORS.chartBlue;
+  kpiData.slice(0, 4).forEach((kpi) => {
     slide.addShape('roundRect', {
-      x: kpiX, y: 0.7, w: 2.2, h: 0.7,
-      fill: { color: bgColor }, rectRadius: 0.05,
+      x: kpiX, y: 0.7, w: 2.2, h: 0.75,
+      fill: { color: KELP_COLORS.primary }, rectRadius: 0.05,
     });
     slide.addText(kpi.value, {
-      x: kpiX, y: 0.72, w: 2.2, h: 0.4,
+      x: kpiX, y: 0.72, w: 2.2, h: 0.35,
       fontSize: 14, bold: true, color: KELP_COLORS.white, align: 'center', fontFace: 'Arial',
     });
-    slide.addText(`${kpi.label}${kpi.change ? ` (${kpi.change > 0 ? '+' : ''}${kpi.change.toFixed(1)}%)` : ''}`, {
-      x: kpiX, y: 1.12, w: 2.2, h: 0.25,
+    slide.addText(kpi.label, {
+      x: kpiX, y: 1.07, w: 2.2, h: 0.18,
       fontSize: 8, color: KELP_COLORS.white, align: 'center', fontFace: 'Arial',
     });
+    if (kpi.subtext) {
+      slide.addText(kpi.subtext, {
+        x: kpiX, y: 1.25, w: 2.2, h: 0.15,
+        fontSize: 7, color: 'BDC3C7', align: 'center', fontFace: 'Arial',
+      });
+    }
     kpiX += 2.35;
   });
 
-  // Bar chart
-  const chartData = teaser.charts.revenueData || [];
+  // Charts from actual data
+  const chartData = data.teaser.charts.revenueData || [];
   const filteredData = chartData.filter(d => d.revenue && d.revenue > 0);
 
   if (filteredData.length > 0) {
     const chartLabels = filteredData.map(d => d.year);
-    const revenueValues = filteredData.map(d => d.revenue || 0);
-    const ebitdaValues = filteredData.map(d => d.ebitda || 0);
-    const patValues = filteredData.map(d => d.pat || 0);
+    const revenueValues = filteredData.map(d => parseFloat((d.revenue || 0).toFixed(2)));
+    const ebitdaValues = filteredData.map(d => parseFloat((d.ebitda || 0).toFixed(2)));
+    const patValues = filteredData.map(d => parseFloat((d.pat || 0).toFixed(2)));
 
-    slide.addChart('bar', [
-      { name: 'Revenue', labels: chartLabels, values: revenueValues },
-      { name: 'EBITDA', labels: chartLabels, values: ebitdaValues },
-      { name: 'PAT', labels: chartLabels, values: patValues },
-    ], {
+    const series: any[] = [{ name: 'Revenue', labels: chartLabels, values: revenueValues }];
+    if (ebitdaValues.some(v => v > 0)) series.push({ name: 'EBITDA', labels: chartLabels, values: ebitdaValues });
+    if (patValues.some(v => v > 0)) series.push({ name: 'PAT', labels: chartLabels, values: patValues });
+
+    slide.addChart('bar', series, {
       x: 0.3, y: 1.6, w: 5.5, h: 3.2,
       barDir: 'col',
       barGrouping: 'clustered',
-      chartColors: [KELP_COLORS.primary, KELP_COLORS.orange, KELP_COLORS.teal],
+      chartColors: [KELP_COLORS.primary, KELP_COLORS.orange, KELP_COLORS.teal].slice(0, series.length),
       showValue: true, dataLabelFontSize: 7, dataLabelColor: KELP_COLORS.textDark,
       catAxisLabelFontSize: 8, valAxisLabelFontSize: 7,
       showLegend: true, legendPos: 'b', legendFontSize: 8,
       valAxisMinVal: 0,
     });
+
+    // Revenue trend line chart
+    slide.addChart('line', [{ name: 'Revenue Trend', labels: chartLabels, values: revenueValues }], {
+      x: 6.0, y: 1.6, w: 3.8, h: 1.4,
+      chartColors: [KELP_COLORS.primary],
+      showValue: true, dataLabelFontSize: 7,
+      catAxisLabelFontSize: 7, valAxisLabelFontSize: 7,
+      showLegend: false, valAxisMinVal: 0,
+      lineDataSymbol: 'circle', lineDataSymbolSize: 6,
+    });
+
+    // EBITDA trend if available
+    if (ebitdaValues.some(v => v > 0)) {
+      slide.addChart('line', [{ name: 'EBITDA Trend', labels: chartLabels, values: ebitdaValues }], {
+        x: 6.0, y: 3.2, w: 3.8, h: 1.4,
+        chartColors: [KELP_COLORS.orange],
+        showValue: true, dataLabelFontSize: 7,
+        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7,
+        showLegend: false, valAxisMinVal: 0,
+        lineDataSymbol: 'circle', lineDataSymbolSize: 6,
+      });
+    }
   }
 
-  // Growth story on right side
-  addSectionHeader(slide, 'Growth Story', 6.0, 1.6, 3.8, KELP_COLORS.orange);
-  const growthStories = data.enhancedContent?.growthStory || [
-    'Strong revenue growth driven by market expansion',
-    'Improving margins through operational efficiency',
-    'Strategic investments in capacity expansion',
-  ];
-
-  let storyY = 2.0;
-  growthStories.slice(0, 4).forEach((story) => {
-    slide.addShape('roundRect', {
-      x: 6.0, y: storyY, w: 3.8, h: 0.55,
-      fill: { color: 'FEF9E7' }, line: { color: KELP_COLORS.orange, width: 0.5 },
-      rectRadius: 0.05,
+  // Growth story from AI (data-backed)
+  if (data.enhancedContent?.growthStory && data.enhancedContent.growthStory.length > 0 && filteredData.length === 0) {
+    addSectionHeader(slide, 'Financial Narrative', 0.3, 1.6, 9.5, KELP_COLORS.orange);
+    let storyY = 2.0;
+    data.enhancedContent.growthStory.slice(0, 3).forEach((story) => {
+      slide.addText(`▸ ${story}`, {
+        x: 0.4, y: storyY, w: 9.3, h: 0.35,
+        fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+      });
+      storyY += 0.4;
     });
-    slide.addText(story, {
-      x: 6.1, y: storyY + 0.08, w: 3.6, h: 0.4,
-      fontSize: 8, color: KELP_COLORS.textDark, valign: 'middle', fontFace: 'Arial',
-    });
-    storyY += 0.62;
-  });
+  }
 
   addFooter(slide);
 }
@@ -527,7 +553,6 @@ function createMarketOpportunitySlide(pres: pptxgen, data: EnhancedSlideData) {
 
   addHeaderBar(slide, 'Market Opportunity');
 
-  // Market size cards
   if (companyData?.marketSize && companyData.marketSize.length > 0) {
     addSectionHeader(slide, 'Addressable Markets', 0.3, 0.7, 9.5);
 
@@ -555,7 +580,7 @@ function createMarketOpportunitySlide(pres: pptxgen, data: EnhancedSlideData) {
     });
   }
 
-  // Opportunities from SWOT
+  // Opportunities from SWOT (actual data)
   addSectionHeader(slide, 'Growth Opportunities', 0.3, 2.6, 9.5, KELP_COLORS.orange);
   const opportunities = companyData?.swot.opportunities || [];
   let oY = 3.0;
@@ -564,7 +589,7 @@ function createMarketOpportunitySlide(pres: pptxgen, data: EnhancedSlideData) {
       x: 0.4, y: oY, w: 0.3, h: 0.35,
       fontSize: 12, bold: true, color: KELP_COLORS.orange, fontFace: 'Arial',
     });
-    slide.addText(opp.split(':')[0] || opp.slice(0, 80), {
+    slide.addText(opp.slice(0, 90), {
       x: 0.75, y: oY, w: 9.0, h: 0.35,
       fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial', valign: 'middle',
     });
@@ -583,7 +608,7 @@ function createMarketOpportunitySlide(pres: pptxgen, data: EnhancedSlideData) {
   addFooter(slide);
 }
 
-// ─── CLIENT RELATIONSHIPS (for service/B2B companies) ───────
+// ─── CLIENT RELATIONSHIPS ───────────────────────────────────
 
 function createClientRelationshipsSlide(pres: pptxgen, data: EnhancedSlideData) {
   const slide = pres.addSlide();
@@ -594,8 +619,6 @@ function createClientRelationshipsSlide(pres: pptxgen, data: EnhancedSlideData) 
   addSectionHeader(slide, 'Marquee Client Base', 0.3, 0.7, 9.5);
 
   const clients = companyData?.clients || [];
-  let cX = 0.4;
-  let cY = 1.15;
   clients.slice(0, 12).forEach((client, idx) => {
     const col = idx % 4;
     const row = Math.floor(idx / 4);
@@ -613,7 +636,6 @@ function createClientRelationshipsSlide(pres: pptxgen, data: EnhancedSlideData) 
     });
   });
 
-  // Industries served below
   if (companyData?.applicationsIndustries && companyData.applicationsIndustries.length > 0) {
     addSectionHeader(slide, 'Industries Served', 0.3, 3.3, 9.5, KELP_COLORS.orange);
     slide.addText(companyData.applicationsIndustries.join('  |  '), {
@@ -625,7 +647,7 @@ function createClientRelationshipsSlide(pres: pptxgen, data: EnhancedSlideData) 
   addFooter(slide);
 }
 
-// ─── OPERATIONAL EXCELLENCE (for asset-heavy/manufacturing) ─
+// ─── OPERATIONAL EXCELLENCE ─────────────────────────────────
 
 function createOperationalExcellenceSlide(pres: pptxgen, data: EnhancedSlideData) {
   const slide = pres.addSlide();
@@ -634,42 +656,42 @@ function createOperationalExcellenceSlide(pres: pptxgen, data: EnhancedSlideData
   addHeaderBar(slide, 'Operational Excellence');
 
   // Certifications
-  addSectionHeader(slide, 'Quality & Certifications', 0.3, 0.7, 4.5);
-  const certs = companyData?.certifications || [];
-  let certY = 1.15;
-  certs.slice(0, 8).forEach((cert) => {
-    slide.addShape('roundRect', {
-      x: 0.4, y: certY, w: 4.3, h: 0.35,
-      fill: { color: KELP_COLORS.lightBlue }, rectRadius: 0.05,
+  if (companyData?.certifications && companyData.certifications.length > 0) {
+    addSectionHeader(slide, 'Quality & Certifications', 0.3, 0.7, 4.5);
+    let certY = 1.15;
+    companyData.certifications.slice(0, 8).forEach((cert) => {
+      slide.addShape('roundRect', {
+        x: 0.4, y: certY, w: 4.3, h: 0.35,
+        fill: { color: KELP_COLORS.lightBlue }, rectRadius: 0.05,
+      });
+      slide.addText(`✓  ${cert}`, {
+        x: 0.5, y: certY + 0.02, w: 4.1, h: 0.3,
+        fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial', valign: 'middle',
+      });
+      certY += 0.4;
     });
-    slide.addText(`✓  ${cert}`, {
-      x: 0.5, y: certY + 0.02, w: 4.1, h: 0.3,
-      fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial', valign: 'middle',
-    });
-    certY += 0.4;
-  });
+  }
 
   // Key operational indicators
-  addSectionHeader(slide, 'Key Operational Indicators', 5.1, 0.7, 4.7, KELP_COLORS.orange);
-  const indicators = companyData?.keyOperationalIndicators || [];
-  let indY = 1.15;
-  indicators.slice(0, 6).forEach((ind) => {
-    slide.addText(`▸ ${ind.slice(0, 60)}`, {
-      x: 5.2, y: indY, w: 4.5, h: 0.32,
-      fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+  if (companyData?.keyOperationalIndicators && companyData.keyOperationalIndicators.length > 0) {
+    addSectionHeader(slide, 'Key Operational Indicators', 5.1, 0.7, 4.7, KELP_COLORS.orange);
+    let indY = 1.15;
+    companyData.keyOperationalIndicators.slice(0, 6).forEach((ind) => {
+      slide.addText(`▸ ${ind.slice(0, 60)}`, {
+        x: 5.2, y: indY, w: 4.5, h: 0.32,
+        fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+      });
+      indY += 0.35;
     });
-    indY += 0.35;
-  });
+  }
 
   // Milestones timeline
   if (companyData?.milestones && companyData.milestones.length > 0) {
     addSectionHeader(slide, 'Key Milestones', 0.3, 3.7, 9.5, KELP_COLORS.teal);
+    slide.addShape('rect', { x: 0.4, y: 4.15, w: 9.3, h: 0.03, fill: { color: KELP_COLORS.teal } });
     let mX = 0.4;
     companyData.milestones.slice(0, 4).forEach((ms) => {
-      slide.addShape('ellipse', {
-        x: mX + 0.8, y: 4.1, w: 0.15, h: 0.15,
-        fill: { color: KELP_COLORS.teal },
-      });
+      slide.addShape('ellipse', { x: mX + 0.8, y: 4.1, w: 0.15, h: 0.15, fill: { color: KELP_COLORS.teal } });
       slide.addText(ms.date, {
         x: mX, y: 4.3, w: 2.2, h: 0.2,
         fontSize: 8, bold: true, color: KELP_COLORS.teal, align: 'center', fontFace: 'Arial',
@@ -680,24 +702,124 @@ function createOperationalExcellenceSlide(pres: pptxgen, data: EnhancedSlideData
       });
       mX += 2.4;
     });
-    // Timeline line
-    slide.addShape('rect', {
-      x: 0.4, y: 4.15, w: 9.3, h: 0.03,
-      fill: { color: KELP_COLORS.teal },
+  }
+
+  addFooter(slide);
+}
+
+// ─── TECHNOLOGY PLATFORM (for SaaS / Deep-tech) ─────────────
+
+function createTechnologyPlatformSlide(pres: pptxgen, data: EnhancedSlideData) {
+  const slide = pres.addSlide();
+  const companyData = data.companyData;
+
+  addHeaderBar(slide, 'Technology Platform & Services');
+
+  // Service/Product portfolio as a grid
+  addSectionHeader(slide, 'Service Portfolio', 0.3, 0.7, 4.5);
+  const products = companyData?.productsServices || [];
+  let pY = 1.15;
+  products.slice(0, 6).forEach((prod, idx) => {
+    slide.addShape('roundRect', {
+      x: 0.4, y: pY, w: 4.3, h: 0.4,
+      fill: { color: idx % 2 === 0 ? KELP_COLORS.lightBlue : KELP_COLORS.lightGray },
+      rectRadius: 0.05,
+    });
+    slide.addText(`${idx + 1}. ${typeof prod === 'string' ? prod.slice(0, 45) : prod}`, {
+      x: 0.5, y: pY + 0.05, w: 4.1, h: 0.3,
+      fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial', valign: 'middle',
+    });
+    pY += 0.45;
+  });
+
+  // Partner ecosystem / Client relationships
+  addSectionHeader(slide, 'Client & Partner Ecosystem', 5.1, 0.7, 4.7, KELP_COLORS.orange);
+  const clients = companyData?.clients || [];
+  let cY = 1.15;
+  clients.slice(0, 6).forEach((client) => {
+    slide.addText(`▸ ${client.slice(0, 30)}`, {
+      x: 5.2, y: cY, w: 4.5, h: 0.3,
+      fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+    });
+    cY += 0.35;
+  });
+
+  // Strengths / Technology advantages
+  if (companyData?.swot.strengths && companyData.swot.strengths.length > 0) {
+    addSectionHeader(slide, 'Technology Advantages', 0.3, 3.8, 9.5, KELP_COLORS.teal);
+    let sY = 4.2;
+    companyData.swot.strengths.slice(0, 3).forEach((s) => {
+      slide.addText(`● ${s.slice(0, 80)}`, {
+        x: 0.4, y: sY, w: 9.3, h: 0.3,
+        fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+      });
+      sY += 0.32;
     });
   }
 
   addFooter(slide);
 }
 
-// ─── GROWTH TRAJECTORY (for SaaS/platform) ──────────────────
+// ─── NETWORK FOOTPRINT (for Consumer / Retail) ──────────────
+
+function createNetworkFootprintSlide(pres: pptxgen, data: EnhancedSlideData) {
+  const slide = pres.addSlide();
+  const companyData = data.companyData;
+
+  addHeaderBar(slide, 'Brand & Network Footprint');
+
+  // Business overview
+  addSectionHeader(slide, 'Business Overview', 0.3, 0.7, 5.2);
+  const bullets = data.enhancedContent?.businessOverview?.bullets || data.teaser.slides[0]?.content.bullets || [];
+  let yPos = 1.1;
+  bullets.slice(0, 4).forEach((bullet) => {
+    slide.addText([
+      { text: '■ ', options: { color: KELP_COLORS.primary, fontSize: 9 } },
+      { text: bullet, options: { color: KELP_COLORS.textDark, fontSize: 9, fontFace: 'Arial' } }
+    ], { x: 0.4, y: yPos, w: 5, h: 0.42, valign: 'top' });
+    yPos += 0.42;
+  });
+
+  // Operational metrics
+  addSectionHeader(slide, 'Operational Metrics', 5.7, 0.7, 4.1, KELP_COLORS.orange);
+  const indicators = companyData?.keyOperationalIndicators || [];
+  let indY = 1.1;
+  indicators.slice(0, 5).forEach((ind) => {
+    slide.addText(`▸ ${ind.slice(0, 50)}`, {
+      x: 5.8, y: indY, w: 3.9, h: 0.3,
+      fontSize: 9, color: KELP_COLORS.textDark, fontFace: 'Arial',
+    });
+    indY += 0.35;
+  });
+
+  // Geographic presence
+  if (companyData?.globalPresence && companyData.globalPresence.length > 0) {
+    addSectionHeader(slide, 'Geographic Presence', 0.3, 3.5, 9.5, KELP_COLORS.teal);
+    let gX = 0.4;
+    companyData.globalPresence.slice(0, 6).forEach((region) => {
+      slide.addShape('roundRect', {
+        x: gX, y: 3.9, w: 1.5, h: 0.45,
+        fill: { color: KELP_COLORS.lightBlue }, rectRadius: 0.05,
+      });
+      slide.addText(region.slice(0, 18), {
+        x: gX, y: 3.95, w: 1.5, h: 0.35,
+        fontSize: 8, color: KELP_COLORS.textDark, align: 'center', fontFace: 'Arial',
+      });
+      gX += 1.6;
+    });
+  }
+
+  addFooter(slide);
+}
+
+// ─── GROWTH TRAJECTORY ──────────────────────────────────────
 
 function createGrowthTrajectorySlide(pres: pptxgen, data: EnhancedSlideData) {
   const slide = pres.addSlide();
 
-  addHeaderBar(slide, 'Growth Trajectory & Future Plans');
+  addHeaderBar(slide, 'Growth Trajectory & Strategic Expansion');
 
-  // Future plans
+  // Future plans from actual data
   addSectionHeader(slide, 'Strategic Growth Initiatives', 0.3, 0.7, 9.5, KELP_COLORS.orange);
   const plans = data.futurePlans;
   let planY = 1.15;
@@ -718,7 +840,7 @@ function createGrowthTrajectorySlide(pres: pptxgen, data: EnhancedSlideData) {
     planY += 0.6;
   });
 
-  // Growth story boxes
+  // Growth story from AI
   const growthStories = data.enhancedContent?.growthStory || [];
   if (growthStories.length > 0) {
     addSectionHeader(slide, 'Growth Narrative', 0.3, 4.0, 9.5);
@@ -747,16 +869,14 @@ function createInvestmentHighlightsSlide(pres: pptxgen, data: EnhancedSlideData,
 
   addHeaderBar(slide, 'Investment Highlights');
 
-  // Investment highlights
   const highlights = data.enhancedContent?.investmentHighlights?.map(h => `${h.title}: ${h.description}`)
     || data.teaser.slides[2]?.content.bullets
-    || ['Market leadership position', 'Strong financial performance', 'Clear growth trajectory'];
+    || [];
 
   const icons = ['🎯', '📊', '🚀', '🌍', '💎', '🔒'];
 
   let hY = 0.75;
   highlights.slice(0, 5).forEach((highlight, idx) => {
-    // Icon circle
     slide.addShape('ellipse', {
       x: 0.4, y: hY, w: 0.45, h: 0.45,
       fill: { color: KELP_COLORS.primary },
@@ -766,7 +886,6 @@ function createInvestmentHighlightsSlide(pres: pptxgen, data: EnhancedSlideData,
       fontSize: 12, align: 'center',
     });
 
-    // Highlight box
     slide.addShape('roundRect', {
       x: 1.0, y: hY, w: 8.8, h: 0.65,
       fill: { color: KELP_COLORS.white },

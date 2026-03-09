@@ -43,7 +43,7 @@ export async function enhanceTeaserContent(
           sector: companyData.templateType,
         },
         archetype: profile?.archetype,
-        narrativeAngles: profile?.narrativeAngles,
+        narrativeStrategy: profile?.narrativeStrategy,
       }
     });
 
