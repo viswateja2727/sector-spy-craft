@@ -192,7 +192,7 @@ export function SlidePreview({ teaser, futurePlans, companyData }: SlidePreviewP
       {profile && (
         <div className="mt-6 p-4 rounded-lg bg-muted/20 border border-border/50">
           <p className="text-xs font-medium text-muted-foreground mb-2">Adaptive Structure Reasoning</p>
-          <p className="text-xs text-muted-foreground">{profile.reasoning}</p>
+          <p className="text-xs text-muted-foreground">{profile.structureReasoning}</p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {profile.slideStructure.map((s, i) => (
               <Badge key={i} variant="secondary" className="text-[10px] px-2 py-0.5">
@@ -200,6 +200,14 @@ export function SlidePreview({ teaser, futurePlans, companyData }: SlidePreviewP
               </Badge>
             ))}
           </div>
+          {profile.narrativeStrategy?.dataBackedAngles && profile.narrativeStrategy.dataBackedAngles.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border/30">
+              <p className="text-[10px] font-medium text-muted-foreground mb-1">Data-Backed Angles</p>
+              {profile.narrativeStrategy.dataBackedAngles.map((angle, i) => (
+                <p key={i} className="text-[10px] text-muted-foreground">▸ {angle}</p>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
